@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: eureka-gateway
+  cloud:
+    loadbalancer:
+      ribbon:
+        enabled: false
+    gateway:
+      routes:
+        - id: app-product
+          predicates:
+            - Path=/app-product/**
+          uri: lb://app-product
+        - id: app-order
+          predicates:
+            - Path=/app-order/**
+          uri: lb://app-order
+
+server:
+  port: 9001
+
+eureka:
+  instance:
+    instance-id:
+      ${spring.application.name}:${spring.application.instance_id:${random.value}}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 2
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:9000/eureka/
