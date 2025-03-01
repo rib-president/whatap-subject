@@ -17,6 +17,8 @@ import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -83,7 +85,7 @@ public class ProductCustomRepositoryImpl implements ProductCustomRepository {
 
   private BooleanExpression createdAtLte(LocalDate createdAt) {
     return createdAt != null ?
-        product.createdAt.loe(createdAt.atTime(23, 59, 59)) : null;
+        product.createdAt.loe(createdAt.atTime(LocalTime.from(LocalDateTime.MAX))) : null;
   }
 
 }

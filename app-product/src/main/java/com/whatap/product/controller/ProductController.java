@@ -1,11 +1,10 @@
 package com.whatap.product.controller;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.whatap.common.dto.CreateResponseDto;
 import com.whatap.common.dto.ListItemResponseDto;
-import com.whatap.product.dto.GetProductResponseDto;
-import com.whatap.product.dto.GetProductsByPaginationRequestDto;
-import com.whatap.product.dto.GetProductsByPaginationResponseDto;
+import com.whatap.common.dto.SuccessResponseDto;
+import com.whatap.product.dto.*;
 import com.whatap.product.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +13,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.math.BigInteger;
 import java.util.Map;
 
@@ -34,8 +34,19 @@ public class ProductController {
   @ResponseStatus(HttpStatus.OK)
   public ListItemResponseDto<GetProductsByPaginationResponseDto> getProductsByPagination(@RequestParam Map<String, String> queryParam,
                                                                                          @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)Pageable pageable) {
-    mapper.configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
     GetProductsByPaginationRequestDto query = mapper.convertValue(queryParam, GetProductsByPaginationRequestDto.class);
     return service.getProductsByPagination(query, pageable);
+  }
+
+  @PostMapping("")
+  @ResponseStatus(HttpStatus.CREATED)
+  public CreateResponseDto<String> addProduct(@Valid @RequestBody AddProductRequestDto body) {
+    return service.addProduct(body);
+  }
+
+  @PutMapping("/{id}")
+  @ResponseStatus(HttpStatus.OK)
+  public SuccessResponseDto updateProduct(@PathVariable BigInteger id, @Valid @RequestBody UpdateProductRequestDto body) {
+    return service.updateProduct(id, body);
   }
 }

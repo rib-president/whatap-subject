@@ -1,18 +1,23 @@
 package com.whatap.product.entity;
 
 import lombok.*;
-import org.hibernate.annotations.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import javax.persistence.*;
-import javax.persistence.Entity;
-import javax.persistence.Table;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @DynamicInsert
 @DynamicUpdate
 @Getter
+@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "product")
 @Entity
 public class Product {
@@ -48,5 +53,11 @@ public class Product {
       return true;
     }
     return false;
+  }
+
+  public void update(String name, BigDecimal price, Integer stock) {
+    Optional.ofNullable(name).ifPresent(n -> this.name = n);
+    Optional.ofNullable(price).ifPresent(p -> this.price = p);
+    Optional.ofNullable(stock).ifPresent(s -> this.stock = s);
   }
 }
