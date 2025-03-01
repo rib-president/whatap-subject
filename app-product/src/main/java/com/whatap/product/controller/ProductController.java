@@ -49,4 +49,10 @@ public class ProductController {
   public SuccessResponseDto updateProduct(@PathVariable BigInteger id, @Valid @RequestBody UpdateProductRequestDto body) {
     return service.updateProduct(id, body);
   }
+
+  @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.OK)
+  public SuccessResponseDto deleteProduct(@PathVariable BigInteger id) {
+    return service.deleteProduct(id);
+  }
 }

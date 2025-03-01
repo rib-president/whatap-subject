@@ -101,6 +101,19 @@ public class ProductService {
         .build();
   }
 
+  public SuccessResponseDto deleteProduct(BigInteger id) {
+    Product product = repository.findById(id)
+        .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
+
+    repository.delete(product);
+
+    queryRepository.deleteById(id.toString());
+
+    return SuccessResponseDto.builder()
+        .success(true)
+        .build();
+  }
+
   private void saveProductInfo(Product product) {
     // 공통 정보 저장
     ProductInfo productInfo = ProductInfo.builder()
