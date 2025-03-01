@@ -1,12 +1,12 @@
 package com.whatap.common.dto;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 @Setter
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SuccessResponseDto {
   private Boolean success;
 }

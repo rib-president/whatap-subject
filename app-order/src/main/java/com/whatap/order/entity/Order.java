@@ -1,6 +1,8 @@
 package com.whatap.order.entity;
 
+import com.whatap.order.enums.OrderStatus;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -25,9 +27,16 @@ public class Order {
   @Column(name = "id", nullable = false, columnDefinition = "BIGINT")
   private BigInteger id;
 
+  @Column(name = "status", nullable = false, length = 16)
+  @Enumerated(EnumType.STRING)
+  @Setter
+  private OrderStatus status;
+
   @Column(name = "total_price", nullable = false, precision = 10, scale = 2)
+  @Setter
   private BigDecimal totalPrice;
 
+  @CreationTimestamp
   @Column(name = "created_at", nullable = false)
   private LocalDateTime createdAt;
 
@@ -36,5 +45,6 @@ public class Order {
   private LocalDateTime updatedAt;
 
   @OneToMany(mappedBy = "order", fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.REMOVE}, orphanRemoval = true)
+  @Setter
   private List<OrderItem> orderItems;
 }

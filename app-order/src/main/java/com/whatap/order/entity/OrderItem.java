@@ -14,7 +14,7 @@ import java.math.BigInteger;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "order__order")
+@Table(name = "order__order_item")
 @Entity
 public class OrderItem {
   @Id

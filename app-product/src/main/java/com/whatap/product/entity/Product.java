@@ -43,18 +43,6 @@ public class Product {
   @Column(name = "updated_at", nullable = false)
   private LocalDateTime updatedAt;
 
-  public void increaseStock(int quantity) {
-    this.stock += quantity;
-  }
-
-  public Boolean decreaseStock(int quantity) {
-    if(this.stock >= quantity) {
-      this.stock -= quantity;
-      return true;
-    }
-    return false;
-  }
-
   public void update(String name, BigDecimal price, Integer stock) {
     Optional.ofNullable(name).ifPresent(n -> this.name = n);
     Optional.ofNullable(price).ifPresent(p -> this.price = p);

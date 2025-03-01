@@ -55,4 +55,17 @@ public class ProductController {
   public SuccessResponseDto deleteProduct(@PathVariable BigInteger id) {
     return service.deleteProduct(id);
   }
+
+
+  /**
+   * micro service간 통신용 API
+   */
+  @PostMapping("/set-product-info/{id}")
+  @ResponseStatus(HttpStatus.OK)
+  public SuccessResponseDto setProductInfo(@PathVariable BigInteger id) {
+    return service.setProductInfo(id);
+  }
+
+
 }
+
