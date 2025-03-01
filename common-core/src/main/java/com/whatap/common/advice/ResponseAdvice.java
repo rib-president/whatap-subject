@@ -13,6 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.UUID;
 
 @RestControllerAdvice
 public class ResponseAdvice implements ResponseBodyAdvice<Object> {
@@ -29,7 +30,7 @@ public class ResponseAdvice implements ResponseBodyAdvice<Object> {
     ResponseDto.ResponseDtoBuilder builder = ResponseDto.builder();
 
     builder.uri(servletRequest.getMethod() + " " + request.getURI().getPath());
-    builder.id(servletRequest.getAttribute("id"));
+    builder.id(UUID.randomUUID().toString());
 
     if(body instanceof List && ((List<?>) body).get(0) instanceof ErrorItemResponseDto) {
       builder.errors((List<ErrorItemResponseDto>) body);
