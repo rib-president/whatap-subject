@@ -18,7 +18,7 @@ import java.util.Optional;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "product")
+@Table(name = "product__product")
 @Entity
 public class Product {
   @Id

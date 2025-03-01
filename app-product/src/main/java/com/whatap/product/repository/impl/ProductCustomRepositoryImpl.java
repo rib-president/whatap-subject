@@ -1,5 +1,7 @@
 package com.whatap.product.repository.impl;
 
+import com.querydsl.core.types.Order;
+import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -19,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -44,9 +47,24 @@ public class ProductCustomRepositoryImpl implements ProductCustomRepository {
         createdAtLte(criteria.getCreatedAtLte())
         );
 
+    List<OrderSpecifier<?>> orderSpecifiers = new ArrayList<>();
+    pageable.getSort().stream()
+        .forEach(sort -> {
+          Order direction = sort.isAscending() ? Order.ASC : com.querydsl.core.types.Order.DESC;
+
+          switch (sort.getProperty()) {
+            case "id": orderSpecifiers.add(new OrderSpecifier<>(direction, product.id)); break;
+            case "name": orderSpecifiers.add(new OrderSpecifier<>(direction, product.name)); break;
+            case "price": orderSpecifiers.add(new OrderSpecifier<>(direction, product.price)); break;
+            case "stock": orderSpecifiers.add(new OrderSpecifier<>(direction, product.stock)); break;
+            case "createdAt": orderSpecifiers.add(new OrderSpecifier<>(direction, product.createdAt)); break;
+            case "updatedAt": orderSpecifiers.add(new OrderSpecifier<>(direction, product.updatedAt)); break;
+          }
+        });
+
     List<Product> products = query.offset(pageable.getOffset())
         .limit(pageable.getPageSize())
-        .orderBy(product.createdAt.desc())
+        .orderBy(orderSpecifiers.toArray(new OrderSpecifier[]{}))
         .fetch();
     Long total = countQuery.fetchOne();
 

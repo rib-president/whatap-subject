@@ -10,9 +10,9 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>common-core</module>
         <module>eureka-server</module>
         <module>eureka-gateway</module>
+        <module>common-core</module>
         <module>app-product</module>
         <module>app-order</module>
     </modules>
