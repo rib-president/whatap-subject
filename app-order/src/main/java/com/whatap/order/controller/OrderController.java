@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.whatap.common.dto.CreateResponseDto;
 import com.whatap.common.dto.ListItemResponseDto;
+import com.whatap.common.dto.SuccessResponseDto;
 import com.whatap.order.dto.GetOrderResponseDto;
 import com.whatap.order.dto.GetOrdersRequestDto;
 import com.whatap.order.dto.GetOrdersResponseDto;
@@ -46,5 +47,11 @@ public class OrderController {
   @ResponseStatus(HttpStatus.CREATED)
   public CreateResponseDto<String> orderProduct(@Valid @RequestBody OrderProductRequestDto body) throws JsonProcessingException {
     return service.orderProduct(body);
+  }
+
+  @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.OK)
+  public SuccessResponseDto deleteOrder(@PathVariable BigInteger id) {
+    return service.deleteOrder(id);
   }
 }

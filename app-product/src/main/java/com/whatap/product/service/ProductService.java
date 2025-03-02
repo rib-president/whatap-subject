@@ -136,7 +136,7 @@ public class ProductService {
 
   @KafkaListener(topics = "order-events", groupId = "product-group")
   public void handleOrderEvent(Event event) throws JsonProcessingException {
-    log.info("Received message: {}", event);
+    log.info("Received message: {}, {}", event.getEventType(), event.getOrderId());
 
     switch (event.getEventType()) {
       case ORDER_CREATED:

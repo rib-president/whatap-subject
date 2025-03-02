@@ -7,16 +7,10 @@ import com.whatap.common.dto.CreateResponseDto;
 import com.whatap.common.dto.ListItemResponseDto;
 import com.whatap.common.dto.SuccessResponseDto;
 import com.whatap.common.entity.ProductInfo;
-import com.whatap.common.event.Event;
-import com.whatap.common.event.EventItem;
-import com.whatap.common.event.OrderCreatedEvent;
-import com.whatap.common.event.StockUpdatedEvent;
+import com.whatap.common.event.*;
 import com.whatap.common.event.enums.EventType;
 import com.whatap.common.repository.ProductInfoRepository;
-import com.whatap.order.dto.GetOrderResponseDto;
-import com.whatap.order.dto.GetOrdersRequestDto;
-import com.whatap.order.dto.GetOrdersResponseDto;
-import com.whatap.order.dto.OrderProductRequestDto;
+import com.whatap.order.dto.*;
 import com.whatap.order.entity.Order;
 import com.whatap.order.entity.OrderItem;
 import com.whatap.order.enums.OrderStatus;
@@ -145,14 +139,48 @@ public class OrderService {
     event.setOrderId(order.getId());
     event.setItems(eventItems);
 
-//    String message = mapper.writeValueAsString(event);
-
     producer.create(event);
 
     return CreateResponseDto.<String>builder()
         .id(order.getId().toString())
         .build();
   }
+
+  public SuccessResponseDto changeOrder(BigInteger id, ChangeOrderRequestDto body) {
+    Order order = repository.findById(id)
+        .orElseThrow(() -> new RuntimeException("ORDER_NOT_FOUND"));
+
+    order.getOrderItems();
+
+    return SuccessResponseDto.builder()
+        .success(true)
+        .build();
+  }
+
+  public SuccessResponseDto deleteOrder(BigInteger id) {
+    Order order = repository.findById(id)
+        .orElseThrow(() -> new RuntimeException("ORDER_NOT_FOUND"));
+
+    OrderCancelledEvent event = new OrderCancelledEvent();
+    event.setOrderId(id);
+    event.setItems(order.getOrderItems().stream()
+        .map(item -> {
+          EventItem.Item eventItem = new EventItem.Item();
+          eventItem.setProductId(item.getProductId());
+          eventItem.setQuantity(item.getQuantity());
+          return eventItem;
+        })
+        .collect(Collectors.toList()));
+
+    repository.delete(order);
+
+    producer.create(event);
+
+    return SuccessResponseDto.builder()
+        .success(true)
+        .build();
+  }
+
 
   @KafkaListener(topics = "product-events", groupId = "order-group")
   public void handleStockUpdatedEvent(Event event) throws JsonProcessingException {
