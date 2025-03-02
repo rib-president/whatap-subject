@@ -7,9 +7,11 @@ import com.whatap.common.dto.CreateResponseDto;
 import com.whatap.common.dto.ListItemResponseDto;
 import com.whatap.common.dto.SuccessResponseDto;
 import com.whatap.common.entity.ProductInfo;
+import com.whatap.common.event.Event;
 import com.whatap.common.event.EventItem;
 import com.whatap.common.event.OrderCreatedEvent;
 import com.whatap.common.event.StockUpdatedEvent;
+import com.whatap.common.event.enums.EventType;
 import com.whatap.common.repository.ProductInfoRepository;
 import com.whatap.order.dto.GetOrderResponseDto;
 import com.whatap.order.dto.GetOrdersRequestDto;
@@ -143,9 +145,9 @@ public class OrderService {
     event.setOrderId(order.getId());
     event.setItems(eventItems);
 
-    String message = mapper.writeValueAsString(event);
+//    String message = mapper.writeValueAsString(event);
 
-    producer.create(message);
+    producer.create(event);
 
     return CreateResponseDto.<String>builder()
         .id(order.getId().toString())
@@ -153,21 +155,25 @@ public class OrderService {
   }
 
   @KafkaListener(topics = "product-events", groupId = "order-group")
-  public void handleStockUpdatedEvent(String message) throws JsonProcessingException {
-    log.info("Received message: {}", message);
+  public void handleStockUpdatedEvent(Event event) throws JsonProcessingException {
+    log.info("Received message: {}", event);
 
-    StockUpdatedEvent event = mapper.readValue(message, StockUpdatedEvent.class);
     Order order = repository.findById(event.getOrderId())
         .orElseThrow(() -> new RuntimeException("ORDER_NOT_FOUND"));
 
-    if(event.getIsSuccess()) {
-      // 주문 성공
-      order.setStatus(OrderStatus.CONFIRMED);
-    } else {
-      // 주문 실패(재고부족)
-      order.setStatus(OrderStatus.CANCELED);
+    if (EventType.STOCK_UPDATED.equals(event.getEventType())) {
+      StockUpdatedEvent stockUpdatedEvent = mapper.convertValue(event, StockUpdatedEvent.class);
+
+      if (stockUpdatedEvent.getIsSuccess()) {
+        // 주문 성공
+        order.setStatus(OrderStatus.CONFIRMED);
+      } else {
+        // 주문 실패(재고부족)
+        order.setStatus(OrderStatus.CANCELED);
+      }
+
+      repository.save(order);
     }
 
-    repository.save(order);
   }
 }

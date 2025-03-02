@@ -33,6 +33,7 @@ public class ProductService {
 
   private final ProductRepository repository;
   private final ProductInfoRepository queryRepository;
+  private final ProductLockService lockService;
 
   private final ObjectMapper mapper;
   private final ProductProducer producer;
@@ -92,9 +93,8 @@ public class ProductService {
         .build();
   }
 
-  @DistributedLock(key = "#p0")
+  @DistributedLock(key = "#id")
   public SuccessResponseDto updateProduct(BigInteger id, UpdateProductRequestDto body) {
-
     Product product = repository.findById(id)
         .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
 
@@ -134,48 +134,45 @@ public class ProductService {
         .build();
   }
 
-//  @DistributedLock(key = "#p0")
   @KafkaListener(topics = "order-events", groupId = "product-group")
-  public void handleOrderCreatedEvent(String message) throws JsonProcessingException {
-    System.out.println("Received message: " + message);
+  public void handleOrderEvent(Event event) throws JsonProcessingException {
+    log.info("Received message: {}", event);
 
-    OrderCreatedEvent event = mapper.readValue(message, OrderCreatedEvent.class);
+    switch (event.getEventType()) {
+      case ORDER_CREATED:
+        OrderCreatedEvent orderCreatedEvent = mapper.convertValue(event, OrderCreatedEvent.class);
+        this.handleOrderCreatedEvent(orderCreatedEvent);
+        break;
+      case ORDER_CANCELLED:
+        OrderCancelledEvent orderCancelledEvent = mapper.convertValue(event, OrderCancelledEvent.class);
+        this.handleOrderCancelledEvent(orderCancelledEvent);
+    }
+  }
 
-    for(OrderCreatedEvent.Item item : event.getItems()) {
-      Product product = repository.findById(item.getProductId())
-          .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
+  private void handleOrderCreatedEvent(OrderCreatedEvent event) throws JsonProcessingException {
+    for (OrderCreatedEvent.Item item : event.getItems()) {
+      Boolean isAvailable = lockService.updateStockWithLock(item);
+      if (!isAvailable) {
+        // StockUpdateEvent 발행
+        StockUpdatedEvent successEvent = new StockUpdatedEvent();
+        successEvent.setOrderId(event.getOrderId());
+        successEvent.setIsSuccess(false);
 
-      // 재고가 부족할 경우
-      if(product.getStock() < item.getQuantity()) {
-        StockUpdatedEvent failedEvent = StockUpdatedEvent.builder()
-            .orderId(event.getOrderId())
-            .isSuccess(false)
-            .build();
-
-        String failedMessage = mapper.writeValueAsString(failedEvent);
-        producer.create(failedMessage);
-
-        return ;
+        producer.create(successEvent);
+        return;
       }
-
-      // 재고 있음
-      product.update(null, null, product.getStock() - item.getQuantity());
-      repository.save(product);
     }
 
     // StockUpdateEvent 발행
-    StockUpdatedEvent successEvent = StockUpdatedEvent.builder()
-        .orderId(event.getOrderId())
-        .isSuccess(true)
-        .build();
+    StockUpdatedEvent successEvent = new StockUpdatedEvent();
+    successEvent.setOrderId(event.getOrderId());
+    successEvent.setIsSuccess(true);
 
-    String successMessage = mapper.writeValueAsString(successEvent);
-    producer.create(successMessage);
+    producer.create(successEvent);
   }
 
-  @KafkaListener(topics = "order-events", groupId = "product-group")
-  public void handleOrderCancelledEvent(OrderCancelledEvent event) {
-    for(EventItem.Item item : event.getItems()) {
+  private void handleOrderCancelledEvent(OrderCancelledEvent event) {
+    for (EventItem.Item item : event.getItems()) {
       Product product = repository.findById(item.getProductId())
           .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
 

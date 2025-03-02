@@ -1,5 +1,6 @@
 package com.whatap.common.event;
 
+import com.whatap.common.event.enums.EventType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,6 +12,11 @@ import java.math.BigInteger;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderCreatedEvent extends EventItem{
+public class OrderCreatedEvent extends EventItem implements Event{
   private BigInteger orderId;
+
+  @Override
+  public EventType getEventType() {
+    return EventType.ORDER_CREATED;
+  }
 }

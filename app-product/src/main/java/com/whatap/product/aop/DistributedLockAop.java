@@ -34,7 +34,7 @@ public class DistributedLockAop {
 
     try {
       boolean available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
-      if(!available) {
+      if (!available) {
         return false;
       }
 
