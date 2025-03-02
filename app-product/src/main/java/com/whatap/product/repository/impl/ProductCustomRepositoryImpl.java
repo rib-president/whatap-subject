@@ -47,6 +47,15 @@ public class ProductCustomRepositoryImpl implements ProductCustomRepository {
         createdAtLte(criteria.getCreatedAtLte())
         );
 
+    countQuery.where(nameContaining(criteria.getName()),
+        priceGte(criteria.getPriceGte()),
+        priceLte(criteria.getPriceLte()),
+        stockGte(criteria.getStockGte()),
+        stockLte(criteria.getStockLte()),
+        createdAtGte(criteria.getCreatedAtGte()),
+        createdAtLte(criteria.getCreatedAtLte())
+    );
+
     List<OrderSpecifier<?>> orderSpecifiers = new ArrayList<>();
     pageable.getSort().stream()
         .forEach(sort -> {

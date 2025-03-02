@@ -20,5 +20,7 @@ public class EventItem {
     private BigInteger productId;
 
     private Integer quantity;
+
+    private Integer latestQuantity;
   }
 }

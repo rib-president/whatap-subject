@@ -126,7 +126,7 @@ public class OrderService {
 
       totalPrice = totalPrice.add(orderItem.getProductPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
 
-      OrderCreatedEvent.Item eventItem = new EventItem.Item(orderItem.getProductId(), orderItem.getQuantity());
+      OrderCreatedEvent.Item eventItem = new EventItem.Item(orderItem.getProductId(), orderItem.getQuantity(), 0);
       eventItems.add(eventItem);
     }
 
@@ -150,7 +150,39 @@ public class OrderService {
     Order order = repository.findById(id)
         .orElseThrow(() -> new RuntimeException("ORDER_NOT_FOUND"));
 
-    order.getOrderItems();
+    if (!OrderStatus.CONFIRMED.equals(order.getStatus())) {
+      throw new RuntimeException("ORDER_REQUEST_FORBIDDEN");
+    }
+
+    List<OrderItem> orderItems = order.getOrderItems();
+    List<EventItem.Item> eventItems = new ArrayList<>();
+    BigDecimal totalPrice = BigDecimal.ZERO;
+
+    for (OrderItem orderItem : orderItems) {
+      ChangeOrderRequestDto.Item foundItem = body.getItems().stream().filter(item -> orderItem.getId().equals(item.getId()))
+          .findAny()
+          .get();
+
+      totalPrice = totalPrice.add(orderItem.getProductPrice().multiply(BigDecimal.valueOf(foundItem.getQuantity())));
+
+      EventItem.Item eventItem = new EventItem.Item();
+      eventItem.setProductId(orderItem.getProductId());
+      eventItem.setLatestQuantity(orderItem.getQuantity());
+      eventItem.setQuantity(foundItem.getQuantity());
+      eventItems.add(eventItem);
+
+      orderItem.setQuantity(foundItem.getQuantity());
+    }
+
+    OrderUpdatedEvent event = new OrderUpdatedEvent();
+    event.setOrderId(id);
+    event.setItems(eventItems);
+
+    order.setStatus(OrderStatus.PENDING);
+    order.setTotalPrice(totalPrice);
+    repository.save(order);
+
+    producer.create(event);
 
     return SuccessResponseDto.builder()
         .success(true)
@@ -161,20 +193,22 @@ public class OrderService {
     Order order = repository.findById(id)
         .orElseThrow(() -> new RuntimeException("ORDER_NOT_FOUND"));
 
-    OrderCancelledEvent event = new OrderCancelledEvent();
-    event.setOrderId(id);
-    event.setItems(order.getOrderItems().stream()
-        .map(item -> {
-          EventItem.Item eventItem = new EventItem.Item();
-          eventItem.setProductId(item.getProductId());
-          eventItem.setQuantity(item.getQuantity());
-          return eventItem;
-        })
-        .collect(Collectors.toList()));
+    if (OrderStatus.CONFIRMED.equals(order.getStatus())) {
+      OrderCancelledEvent event = new OrderCancelledEvent();
+      event.setOrderId(id);
+      event.setItems(order.getOrderItems().stream()
+          .map(item -> {
+            EventItem.Item eventItem = new EventItem.Item();
+            eventItem.setProductId(item.getProductId());
+            eventItem.setQuantity(item.getQuantity());
+            return eventItem;
+          })
+          .collect(Collectors.toList()));
+
+      producer.create(event);
+    }
 
     repository.delete(order);
-
-    producer.create(event);
 
     return SuccessResponseDto.builder()
         .success(true)
@@ -190,18 +224,30 @@ public class OrderService {
         .orElseThrow(() -> new RuntimeException("ORDER_NOT_FOUND"));
 
     if (EventType.STOCK_UPDATED.equals(event.getEventType())) {
-      StockUpdatedEvent stockUpdatedEvent = mapper.convertValue(event, StockUpdatedEvent.class);
+      // 주문 성공
+      order.setStatus(OrderStatus.CONFIRMED);
 
-      if (stockUpdatedEvent.getIsSuccess()) {
-        // 주문 성공
-        order.setStatus(OrderStatus.CONFIRMED);
-      } else {
-        // 주문 실패(재고부족)
-        order.setStatus(OrderStatus.CANCELED);
+    } else if (EventType.STOCK_FAILED.equals(event.getEventType())) {
+      order.setStatus(OrderStatus.CANCELED);
+
+    } else if (EventType.STOCK_ROLLBACK.equals(event.getEventType())) {
+      StockFailedEvent stockFailedEvent = mapper.convertValue(event, StockFailedEvent.class);
+
+      List<OrderItem> orderItems = order.getOrderItems();
+      BigDecimal totalPrice = BigDecimal.ZERO;
+
+      for(OrderItem orderItem : orderItems) {
+        EventItem.Item foundItem = stockFailedEvent.getItems().stream().filter(item -> orderItem.getProductId().equals(item.getProductId()))
+            .findAny()
+            .get();
+        orderItem.setQuantity(foundItem.getLatestQuantity());
+        totalPrice = totalPrice.add(orderItem.getProductPrice().multiply(BigDecimal.valueOf(foundItem.getLatestQuantity())));
       }
 
-      repository.save(order);
+      order.setTotalPrice(totalPrice);
+      order.setStatus(OrderStatus.CONFIRMED);
     }
 
+    repository.save(order);
   }
 }

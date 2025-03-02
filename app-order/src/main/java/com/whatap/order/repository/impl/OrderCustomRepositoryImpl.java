@@ -48,6 +48,13 @@ public class OrderCustomRepositoryImpl implements OrderCustomRepository {
         createdAtLte(criteria.getCreatedAtLte())
     );
 
+    countQuery.where(totalPriceGte(criteria.getTotalPriceGte()),
+        totalPriceLte(criteria.getTotalPriceLte()),
+        productNameContaining(criteria.getProductName()),
+        createdAtGte(criteria.getCreatedAtGte()),
+        createdAtLte(criteria.getCreatedAtLte())
+    );
+
     List<OrderSpecifier<?>> orderSpecifiers = new ArrayList<>();
     pageable.getSort().stream()
         .forEach(sort -> {

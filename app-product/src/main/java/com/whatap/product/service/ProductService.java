@@ -7,6 +7,7 @@ import com.whatap.common.dto.ListItemResponseDto;
 import com.whatap.common.dto.SuccessResponseDto;
 import com.whatap.common.entity.ProductInfo;
 import com.whatap.common.event.*;
+import com.whatap.common.event.enums.EventType;
 import com.whatap.common.repository.ProductInfoRepository;
 import com.whatap.product.aop.annotation.DistributedLock;
 import com.whatap.product.dto.*;
@@ -143,9 +144,14 @@ public class ProductService {
         OrderCreatedEvent orderCreatedEvent = mapper.convertValue(event, OrderCreatedEvent.class);
         this.handleOrderCreatedEvent(orderCreatedEvent);
         break;
+      case ORDER_UPDATED:
+        OrderUpdatedEvent orderUpdatedEvent = mapper.convertValue(event, OrderUpdatedEvent.class);
+        this.handleOrderUpdatedEvent(orderUpdatedEvent);
+        break;
       case ORDER_CANCELLED:
         OrderCancelledEvent orderCancelledEvent = mapper.convertValue(event, OrderCancelledEvent.class);
         this.handleOrderCancelledEvent(orderCancelledEvent);
+        break;
     }
   }
 
@@ -154,11 +160,11 @@ public class ProductService {
       Boolean isAvailable = lockService.updateStockWithLock(item);
       if (!isAvailable) {
         // StockUpdateEvent 발행
-        StockUpdatedEvent successEvent = new StockUpdatedEvent();
-        successEvent.setOrderId(event.getOrderId());
-        successEvent.setIsSuccess(false);
+        StockFailedEvent failedEvent = new StockFailedEvent();
+        failedEvent.setOrderId(event.getOrderId());
+        failedEvent.setEventType(EventType.STOCK_FAILED);
 
-        producer.create(successEvent);
+        producer.create(failedEvent);
         return;
       }
     }
@@ -166,7 +172,28 @@ public class ProductService {
     // StockUpdateEvent 발행
     StockUpdatedEvent successEvent = new StockUpdatedEvent();
     successEvent.setOrderId(event.getOrderId());
-    successEvent.setIsSuccess(true);
+
+    producer.create(successEvent);
+  }
+
+  private void handleOrderUpdatedEvent(OrderUpdatedEvent event) throws JsonProcessingException {
+    for (OrderUpdatedEvent.Item item : event.getItems()) {
+      Boolean isAvailable = lockService.updateStockWithLock(item);
+      if (!isAvailable) {
+        // StockRollbackEvent 발행
+        StockFailedEvent failedEvent = new StockFailedEvent();
+        failedEvent.setOrderId(event.getOrderId());
+        failedEvent.setEventType(EventType.STOCK_ROLLBACK);
+        failedEvent.setItems(event.getItems());
+
+        producer.create(failedEvent);
+        return;
+      }
+    }
+
+    // StockUpdateEvent 발행
+    StockUpdatedEvent successEvent = new StockUpdatedEvent();
+    successEvent.setOrderId(event.getOrderId());
 
     producer.create(successEvent);
   }

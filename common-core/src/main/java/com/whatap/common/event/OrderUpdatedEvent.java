@@ -1,7 +1,10 @@
 package com.whatap.common.event;
 
 import com.whatap.common.event.enums.EventType;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigInteger;
 
@@ -9,11 +12,11 @@ import java.math.BigInteger;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class StockUpdatedEvent implements Event{
+public class OrderUpdatedEvent extends EventItem implements Event{
   private BigInteger orderId;
 
   @Override
   public EventType getEventType() {
-    return EventType.STOCK_UPDATED;
+    return EventType.ORDER_UPDATED;
   }
 }

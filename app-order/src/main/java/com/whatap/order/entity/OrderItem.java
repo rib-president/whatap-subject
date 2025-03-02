@@ -36,5 +36,6 @@ public class OrderItem {
   private BigDecimal productPrice;
 
   @Column(name = "quantity")
+  @Setter
   private Integer quantity;
 }
