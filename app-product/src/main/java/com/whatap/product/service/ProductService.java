@@ -18,11 +18,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.util.Pair;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -156,18 +158,29 @@ public class ProductService {
   }
 
   private void handleOrderCreatedEvent(OrderCreatedEvent event) throws JsonProcessingException {
+    List<Pair<Product, Integer>> updatedProducts = new ArrayList<>();
     for (OrderCreatedEvent.Item item : event.getItems()) {
+
       Boolean isAvailable = lockService.updateStockWithLock(item);
       if (!isAvailable) {
         // StockUpdateEvent 발행
-        StockFailedEvent failedEvent = new StockFailedEvent();
-        failedEvent.setOrderId(event.getOrderId());
-        failedEvent.setEventType(EventType.STOCK_FAILED);
+        StockFailedEvent failedEvent = new StockFailedEvent(event.getOrderId(), EventType.STOCK_FAILED);
 
         producer.create(failedEvent);
         return;
+      } else {
+        Product product = repository.findById(item.getProductId())
+            .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
+
+        Pair<Product, Integer> updatedProduct = Pair.of(product, product.getStock() - (item.getQuantity() - item.getLatestQuantity()));
+        updatedProducts.add(updatedProduct);
       }
     }
+
+    updatedProducts
+            .forEach(updatedProduct -> updatedProduct.getFirst().setStock(updatedProduct.getSecond()));
+
+//    repository.saveAll(products);
 
     // StockUpdateEvent 발행
     StockUpdatedEvent successEvent = new StockUpdatedEvent();
@@ -177,19 +190,28 @@ public class ProductService {
   }
 
   private void handleOrderUpdatedEvent(OrderUpdatedEvent event) throws JsonProcessingException {
+    List<Pair<Product, Integer>> updatedProducts = new ArrayList<>();
     for (OrderUpdatedEvent.Item item : event.getItems()) {
       Boolean isAvailable = lockService.updateStockWithLock(item);
       if (!isAvailable) {
         // StockRollbackEvent 발행
-        StockFailedEvent failedEvent = new StockFailedEvent();
-        failedEvent.setOrderId(event.getOrderId());
-        failedEvent.setEventType(EventType.STOCK_ROLLBACK);
-        failedEvent.setItems(event.getItems());
+        StockFailedEvent failedEvent = new StockFailedEvent(event.getOrderId(), EventType.STOCK_ROLLBACK, event.getItems());
 
         producer.create(failedEvent);
         return;
+      } else {
+        Product product = repository.findById(item.getProductId())
+            .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
+
+        Pair<Product, Integer> updatedProduct = Pair.of(product, product.getStock() - (item.getQuantity() - item.getLatestQuantity()));
+        updatedProducts.add(updatedProduct);
       }
     }
+
+    updatedProducts
+        .forEach(updatedProduct -> updatedProduct.getFirst().setStock(updatedProduct.getSecond()));
+
+//    repository.saveAll(products);
 
     // StockUpdateEvent 발행
     StockUpdatedEvent successEvent = new StockUpdatedEvent();

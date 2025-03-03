@@ -19,7 +19,7 @@ public class ExceptionAdvice {
     ex.printStackTrace();
 
     ErrorItemResponseDto errors = ErrorItemResponseDto.builder()
-        .code(ex.getMessage())
+        .code(HttpStatus.BAD_REQUEST.name())
         .message(ex.getMessage())
         .build();
 
@@ -31,7 +31,7 @@ public class ExceptionAdvice {
     ex.printStackTrace();
 
     ErrorItemResponseDto errors = ErrorItemResponseDto.builder()
-        .code(ex.getMessage())
+        .code(HttpStatus.BAD_REQUEST.name())
         .message(ex.getMessage())
         .build();
 
@@ -43,7 +43,7 @@ public class ExceptionAdvice {
     ex.printStackTrace();
 
     ErrorItemResponseDto errors = ErrorItemResponseDto.builder()
-        .code(ex.getMessage())
+        .code(HttpStatus.INTERNAL_SERVER_ERROR.name())
         .message(ex.getMessage())
         .build();
 
@@ -55,7 +55,7 @@ public class ExceptionAdvice {
     ex.printStackTrace();
 
     ErrorItemResponseDto errors = ErrorItemResponseDto.builder()
-        .code(ex.getMessage())
+        .code(HttpStatus.UNPROCESSABLE_ENTITY.name())
         .message(ex.getMessage())
         .build();
 

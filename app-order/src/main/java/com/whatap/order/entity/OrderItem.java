@@ -11,6 +11,7 @@ import java.math.BigInteger;
 @DynamicInsert
 @DynamicUpdate
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)

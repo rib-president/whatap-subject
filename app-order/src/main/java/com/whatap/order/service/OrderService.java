@@ -15,6 +15,7 @@ import com.whatap.order.entity.Order;
 import com.whatap.order.entity.OrderItem;
 import com.whatap.order.enums.OrderStatus;
 import com.whatap.order.producer.OrderProducer;
+import com.whatap.order.repository.OrderItemRepository;
 import com.whatap.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 @Transactional(rollbackFor = Exception.class)
 public class OrderService {
   private final OrderRepository repository;
+  private final OrderItemRepository itemRepository;
   private final ProductInfoRepository queryRepository;
 
   private final HttpClient httpClient;
@@ -98,30 +101,17 @@ public class OrderService {
 
     Order order = Order.builder()
         .status(OrderStatus.PENDING)
+        .ordererName(body.getOrdererName())
+        .ordererPhoneNumber(body.getOrdererPhoneNumber())
+        .ordererAddress(body.getOrdererAddress())
         .build();
 
     BigDecimal totalPrice = BigDecimal.ZERO;
     List<OrderItem> orderItems = new ArrayList<>();
     List<OrderCreatedEvent.Item> eventItems = new ArrayList<>();
-    for (OrderProductRequestDto.Item item : body.getItems()) {
-      ProductInfo productInfo = queryRepository.findById(item.getProductId().toString())
-          .orElse(null);
-
-      if (productInfo == null) {
-        String url = baseUrl + appProductName + setProductInfoApi.replace("{}", item.getProductId().toString());
-        SuccessResponseDto resp = httpClient.post(url, null, SuccessResponseDto.class);
-
-        productInfo = queryRepository.findById(item.getProductId().toString())
-            .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
-      }
-
-      OrderItem orderItem = OrderItem.builder()
-          .order(order)
-          .productId(item.getProductId())
-          .productName(productInfo.getName())
-          .productPrice(productInfo.getPrice())
-          .quantity(item.getQuantity())
-          .build();
+    for (OrderItemDto item : body.getItems()) {
+      OrderItem orderItem = this.createOrderItem(item);
+      orderItem.setOrder(order);
       orderItems.add(orderItem);
 
       totalPrice = totalPrice.add(orderItem.getProductPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
@@ -155,34 +145,55 @@ public class OrderService {
     }
 
     List<OrderItem> orderItems = order.getOrderItems();
+
     List<EventItem.Item> eventItems = new ArrayList<>();
+    List<OrderItem> newOrderItems = new ArrayList<>();
     BigDecimal totalPrice = BigDecimal.ZERO;
-
-    for (OrderItem orderItem : orderItems) {
-      ChangeOrderRequestDto.Item foundItem = body.getItems().stream().filter(item -> orderItem.getId().equals(item.getId()))
+    for (ChangeOrderRequestDto.Item item : body.getItems()) {
+      OrderItem orderItem = orderItems.stream()
+          .filter(oi -> item.getProductId().equals(oi.getProductId()))
           .findAny()
-          .get();
+          .orElse(null);
 
-      totalPrice = totalPrice.add(orderItem.getProductPrice().multiply(BigDecimal.valueOf(foundItem.getQuantity())));
+      Integer latestQuantity = 0;
+      // 새로 추가된 상품
+      if (orderItem == null) {
+        orderItem = this.createOrderItem(item);
+        orderItem.setOrder(order);
 
-      EventItem.Item eventItem = new EventItem.Item();
-      eventItem.setProductId(orderItem.getProductId());
-      eventItem.setLatestQuantity(orderItem.getQuantity());
-      eventItem.setQuantity(foundItem.getQuantity());
+        latestQuantity = 0;
+      } else {  // 기존 주문된 상품
+        latestQuantity = orderItem.getQuantity();
+        orderItem.setQuantity(item.getQuantity());
+      }
+      newOrderItems.add(orderItem);
+      totalPrice = totalPrice.add(orderItem.getProductPrice().multiply(BigDecimal.valueOf(orderItem.getQuantity())));
+
+      EventItem.Item eventItem = new EventItem.Item(orderItem.getProductId(), item.getQuantity(), latestQuantity);
       eventItems.add(eventItem);
-
-      orderItem.setQuantity(foundItem.getQuantity());
     }
 
-    OrderUpdatedEvent event = new OrderUpdatedEvent();
-    event.setOrderId(id);
-    event.setItems(eventItems);
+    List<EventItem.Item> rollbackItems = orderItems.stream()
+        .filter(orderItem -> newOrderItems.stream()
+            .noneMatch(newItem -> Objects.equals(newItem.getId(), orderItem.getId())))
+        .map(orderItem -> {
+          EventItem.Item rollbackedItem =  new EventItem.Item(orderItem.getProductId(), 0, orderItem.getQuantity());
+          rollbackedItem.setProductName(orderItem.getProductName());
+          rollbackedItem.setProductPrice(orderItem.getProductPrice());
 
-    order.setStatus(OrderStatus.PENDING);
-    order.setTotalPrice(totalPrice);
-    repository.save(order);
+          return rollbackedItem;
+        })
+        .collect(Collectors.toList());
+    eventItems.addAll(rollbackItems);
+    OrderUpdatedEvent updatedEvent = new OrderUpdatedEvent(id, eventItems);
 
-    producer.create(event);
+    order.update(OrderStatus.PENDING, totalPrice, body.getOrdererName(), body.getOrdererPhoneNumber(), body.getOrdererAddress());
+    orderItems.clear();
+    orderItems.addAll(newOrderItems);
+
+    repository.saveAndFlush(order);
+
+    producer.create(updatedEvent);
 
     return SuccessResponseDto.builder()
         .success(true)
@@ -197,12 +208,7 @@ public class OrderService {
       OrderCancelledEvent event = new OrderCancelledEvent();
       event.setOrderId(id);
       event.setItems(order.getOrderItems().stream()
-          .map(item -> {
-            EventItem.Item eventItem = new EventItem.Item();
-            eventItem.setProductId(item.getProductId());
-            eventItem.setQuantity(item.getQuantity());
-            return eventItem;
-          })
+          .map(item -> new EventItem.Item(item.getProductId(), item.getQuantity(), 0))
           .collect(Collectors.toList()));
 
       producer.create(event);
@@ -218,11 +224,10 @@ public class OrderService {
 
   @KafkaListener(topics = "product-events", groupId = "order-group")
   public void handleStockUpdatedEvent(Event event) throws JsonProcessingException {
-    log.info("Received message: {}", event);
+    log.info("Received message: {} {}", event.getOrderId(), event.getEventType());
 
     Order order = repository.findById(event.getOrderId())
         .orElseThrow(() -> new RuntimeException("ORDER_NOT_FOUND"));
-
     if (EventType.STOCK_UPDATED.equals(event.getEventType())) {
       // 주문 성공
       order.setStatus(OrderStatus.CONFIRMED);
@@ -232,22 +237,60 @@ public class OrderService {
 
     } else if (EventType.STOCK_ROLLBACK.equals(event.getEventType())) {
       StockFailedEvent stockFailedEvent = mapper.convertValue(event, StockFailedEvent.class);
-
       List<OrderItem> orderItems = order.getOrderItems();
       BigDecimal totalPrice = BigDecimal.ZERO;
-
-      for(OrderItem orderItem : orderItems) {
-        EventItem.Item foundItem = stockFailedEvent.getItems().stream().filter(item -> orderItem.getProductId().equals(item.getProductId()))
+      List<OrderItem> deletedOrderItems = new ArrayList<>();
+      for (EventItem.Item eventItem : stockFailedEvent.getItems()) {
+        OrderItem foundItem = orderItems.stream().filter(item -> item.getProductId().equals(eventItem.getProductId()))
             .findAny()
-            .get();
-        orderItem.setQuantity(foundItem.getLatestQuantity());
-        totalPrice = totalPrice.add(orderItem.getProductPrice().multiply(BigDecimal.valueOf(foundItem.getLatestQuantity())));
+            .orElse(null);
+
+        if (foundItem != null) {
+          if (eventItem.getLatestQuantity() > 0) {
+            foundItem.setQuantity(eventItem.getLatestQuantity());
+            totalPrice = totalPrice.add(foundItem.getProductPrice().multiply(BigDecimal.valueOf(eventItem.getLatestQuantity())));
+          } else {
+            orderItems.remove(foundItem);
+          }
+        } else {
+          OrderItem rollbackedOrderItem = OrderItem.builder()
+              .order(order)
+              .productId(eventItem.getProductId())
+              .productName(eventItem.getProductName())
+              .productPrice(eventItem.getProductPrice())
+              .quantity(eventItem.getLatestQuantity())
+              .build();
+          totalPrice = totalPrice.add(eventItem.getProductPrice().multiply(BigDecimal.valueOf(eventItem.getLatestQuantity())));
+          orderItems.add(rollbackedOrderItem);
+        }
       }
 
       order.setTotalPrice(totalPrice);
       order.setStatus(OrderStatus.CONFIRMED);
+
+    }
+    repository.save(order);
+  }
+
+  private OrderItem createOrderItem(OrderItemDto item) {
+    ProductInfo productInfo = queryRepository.findById(item.getProductId().toString())
+        .orElse(null);
+
+    if (productInfo == null) {
+      String url = baseUrl + appProductName + setProductInfoApi.replace("{}", item.getProductId().toString());
+      SuccessResponseDto resp = httpClient.post(url, null, SuccessResponseDto.class);
+
+      productInfo = queryRepository.findById(item.getProductId().toString())
+          .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
     }
 
-    repository.save(order);
+    OrderItem orderItem = OrderItem.builder()
+        .productId(item.getProductId())
+        .productName(productInfo.getName())
+        .productPrice(productInfo.getPrice())
+        .quantity(item.getQuantity())
+        .build();
+
+    return orderItem;
   }
 }

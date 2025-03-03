@@ -25,9 +25,6 @@ public class ProductLockService {
     }
 
     // 재고 있음
-    product.update(null, null, product.getStock() - updatedQuantity);
-
-    repository.save(product);
     return true;
   }
 }
