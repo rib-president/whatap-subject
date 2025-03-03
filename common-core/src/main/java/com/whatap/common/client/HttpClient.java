@@ -5,6 +5,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+
+/**
+ * RestTemplate을 사용한 RESTful API 통신 클라이언트(동기방식)
+ */
 @Component
 public class HttpClient {
   private final RestTemplate restTemplate;

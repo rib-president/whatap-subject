@@ -29,12 +29,16 @@ public class DistributedLockAop {
     Method method = signature.getMethod();
     DistributedLock distributedLock = method.getAnnotation(DistributedLock.class);
 
+    // 어노테이션의 key의 값을 가져와 고유키 생성(ex. LOCK:1)
     String key = REDISSON_LOCK_PREFIX + CustomSpringELParser.getDynamicValue(signature.getParameterNames(), joinPoint.getArgs(), distributedLock.key());
+
     RLock rLock = redissonClient.getLock(key);
 
     try {
+      // 락 획득 시도
       boolean available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
       if (!available) {
+        // 획득 실패
         return false;
       }
 

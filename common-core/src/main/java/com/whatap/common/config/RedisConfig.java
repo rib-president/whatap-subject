@@ -12,6 +12,10 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+/**
+ * redis 설정
+ * - 분산락을 통한 동시성문제 해결을 위해 lettuce가 아닌 redisson 사용
+ */
 @Configuration
 public class RedisConfig {
   @Value("${spring.redis.host}")
