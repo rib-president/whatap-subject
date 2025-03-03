@@ -60,6 +60,7 @@ public class OrderService {
     List<GetOrdersResponseDto> items = orders.stream()
         .map(order -> GetOrdersResponseDto.builder()
             .id(order.getId().toString())
+            .ordererName(order.getOrdererName())
             .totalPrice(order.getTotalPrice().toString())
             .item(order.getOrderItems().stream().findAny().get()
                 .getProductName() + (order.getOrderItems().size() > 1 ? " 외 " + (order.getOrderItems().size() - 1) + "건" : ""))
@@ -83,6 +84,9 @@ public class OrderService {
 
     return GetOrderResponseDto.builder()
         .id(order.getId().toString())
+        .ordererName(order.getOrdererName())
+        .ordererPhoneNumber(order.getOrdererPhoneNumber())
+        .ordererAddress(order.getOrdererAddress())
         .totalPrice(order.getTotalPrice().toString())
         .items(order.getOrderItems().stream()
             .map(item -> GetOrderResponseDto.Item.builder()

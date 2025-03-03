@@ -10,6 +10,7 @@ import lombok.Setter;
 public class GetOrdersResponseDto {
   private String id;
 
+  private String ordererName;
   private String totalPrice;
 
   private String item;

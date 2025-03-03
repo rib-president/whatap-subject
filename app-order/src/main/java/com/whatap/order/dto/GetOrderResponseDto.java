@@ -12,6 +12,10 @@ import java.util.List;
 public class GetOrderResponseDto {
   private String id;
 
+  private String ordererName;
+  private String ordererPhoneNumber;
+  private String ordererAddress;
+
   private String totalPrice;
 
   private List<Item> items;
