@@ -84,6 +84,7 @@ public class OrderService {
 
     return GetOrderResponseDto.builder()
         .id(order.getId().toString())
+        .status(order.getStatus())
         .ordererName(order.getOrdererName())
         .ordererPhoneNumber(order.getOrdererPhoneNumber())
         .ordererAddress(order.getOrdererAddress())

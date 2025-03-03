@@ -49,8 +49,4 @@ public class Product {
     Optional.ofNullable(price).ifPresent(p -> this.price = p);
     Optional.ofNullable(stock).ifPresent(s -> this.stock = s);
   }
-
-  public Boolean isOrderable() {
-    return this.stock >= 0;
-  }
 }

@@ -1,5 +1,6 @@
 package com.whatap.order.dto;
 
+import com.whatap.order.enums.OrderStatus;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,6 +12,8 @@ import java.util.List;
 @Builder
 public class GetOrderResponseDto {
   private String id;
+
+  private OrderStatus status;
 
   private String ordererName;
   private String ordererPhoneNumber;

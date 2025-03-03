@@ -180,8 +180,6 @@ public class ProductService {
     updatedProducts
             .forEach(updatedProduct -> updatedProduct.getFirst().setStock(updatedProduct.getSecond()));
 
-//    repository.saveAll(products);
-
     // StockUpdateEvent 발행
     StockUpdatedEvent successEvent = new StockUpdatedEvent();
     successEvent.setOrderId(event.getOrderId());
@@ -201,17 +199,17 @@ public class ProductService {
         return;
       } else {
         Product product = repository.findById(item.getProductId())
-            .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
+            .orElse(null);
 
-        Pair<Product, Integer> updatedProduct = Pair.of(product, product.getStock() - (item.getQuantity() - item.getLatestQuantity()));
-        updatedProducts.add(updatedProduct);
+        if(product != null) {
+          Pair<Product, Integer> updatedProduct = Pair.of(product, product.getStock() - (item.getQuantity() - item.getLatestQuantity()));
+          updatedProducts.add(updatedProduct);
+        }
       }
     }
 
     updatedProducts
         .forEach(updatedProduct -> updatedProduct.getFirst().setStock(updatedProduct.getSecond()));
-
-//    repository.saveAll(products);
 
     // StockUpdateEvent 발행
     StockUpdatedEvent successEvent = new StockUpdatedEvent();
@@ -223,11 +221,13 @@ public class ProductService {
   private void handleOrderCancelledEvent(OrderCancelledEvent event) {
     for (EventItem.Item item : event.getItems()) {
       Product product = repository.findById(item.getProductId())
-          .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
+          .orElse(null);
 
-      // 재고복구
-      product.update(null, null, product.getStock() + item.getQuantity());
-      repository.save(product);
+      if(product != null) {
+        // 재고복구
+        product.update(null, null, product.getStock() + item.getQuantity());
+        repository.save(product);
+      }
     }
   }
 

@@ -15,12 +15,12 @@ public class ProductLockService {
   @DistributedLock(key = "#item.productId")
   public Boolean updateStockWithLock(EventItem.Item item) {
     Product product = repository.findById(item.getProductId())
-        .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
+        .orElse(null);
 
     Integer updatedQuantity = item.getQuantity() - item.getLatestQuantity();
 
-    // 재고가 부족할 경우
-    if (product.getStock() < updatedQuantity) {
+    // 삭제된 상품을 업데이트하려하거나 재고가 부족할 경우
+    if ((product == null && item.getQuantity() > 0) ||(product != null && product.getStock() < updatedQuantity)) {
       return false;
     }
 
