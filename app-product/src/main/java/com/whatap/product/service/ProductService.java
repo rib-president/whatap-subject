@@ -119,6 +119,7 @@ public class ProductService {
         .build();
   }
 
+  @DistributedLock(key = "#id") // redisson을 사용한 분산락 적용 어노테이션(상품의 id가 고유키로 사용됨)
   public SuccessResponseDto deleteProduct(BigInteger id) {
     // id를 가진 product entity 가져오기
     Product product = repository.findById(id)
